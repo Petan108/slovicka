@@ -401,7 +401,7 @@ async function handleTranslate() {
   btn.innerHTML = '<div class="spinner"></div> Překládám…';
 
   try {
-    const resp = await fetch('/api/translate', {
+    const resp = await fetch('/.netlify/functions/translate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ words })
