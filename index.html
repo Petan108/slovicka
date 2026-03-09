@@ -171,12 +171,12 @@ input::placeholder, textarea::placeholder { color:var(--dim); }
         <input type="text" id="setName" placeholder="např. Lekce 3 – cestování">
       </div>
       <div class="field-group">
-        <div class="field-label">Rychlé přidání přes AI ✨</div>
+        <div class="field-label">Rychlé vložení slovíček</div>
         <div class="ai-box">
-          <div class="ai-hint">Vlož anglická slovíčka (každé na nový řádek) – AI je automaticky přeloží do češtiny.</div>
-          <textarea id="pasteArea" rows="6" placeholder="apple&#10;banana&#10;to run&#10;beautiful&#10;..."></textarea>
+          <div class="ai-hint">Vlož slovíčka ve formátu <strong style="color:var(--accent)">anglicky-česky</strong>, oddělená středníkem.<br>Např: <span style="color:var(--text)">apple-jablko; to run-běžet; house-dům</span></div>
+          <textarea id="pasteArea" rows="5" placeholder="apple-jablko; banana-banán; to run-běžet; beautiful-krásný"></textarea>
           <div class="ai-error" id="aiError" style="display:none"></div>
-          <button class="btn-translate disabled" id="btnTranslate" onclick="handleTranslate()">✨ Přeložit a přidat</button>
+          <button class="btn-translate disabled" id="btnTranslate" onclick="handlePaste()">+ Přidat slovíčka</button>
         </div>
       </div>
       <div class="field-group">
@@ -370,61 +370,55 @@ function getWords() {
   })).filter(w => w.en && w.cs);
 }
 
-// ── AI TRANSLATE ──
+// ── PASTE SLOVÍČKA ──
 document.getElementById('pasteArea').addEventListener('input', function() {
   const btn = document.getElementById('btnTranslate');
   if (this.value.trim()) {
     btn.className = 'btn-translate ready';
-    btn.innerHTML = '✨ Přeložit a přidat';
+    btn.innerHTML = '+ Přidat slovíčka';
   } else {
-    resetTranslateBtn();
+    btn.className = 'btn-translate disabled';
+    btn.innerHTML = '+ Přidat slovíčka';
   }
 });
 
-function resetTranslateBtn() {
-  const btn = document.getElementById('btnTranslate');
-  btn.className = 'btn-translate disabled';
-  btn.innerHTML = '✨ Přeložit a přidat';
-}
-
-async function handleTranslate() {
+function handlePaste() {
   const text = document.getElementById('pasteArea').value.trim();
   if (!text) return;
-  const btn = document.getElementById('btnTranslate');
   const errEl = document.getElementById('aiError');
   errEl.style.display = 'none';
 
-  const words = text.split('\n').map(w => w.trim()).filter(Boolean);
-  if (!words.length) return;
+  // Rozdělení středníkem, podpora také pro nový řádek
+  const pairs = text.split(/[;\n]/).map(s => s.trim()).filter(Boolean);
+  const failed = [];
 
-  btn.className = 'btn-translate loading';
-  btn.innerHTML = '<div class="spinner"></div> Překládám…';
-
-  try {
-    const resp = await fetch('/.netlify/functions/translate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ words })
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
-    if (data.error) throw new Error(data.error);
-
-    const failed = data.results.filter(w => !w.cs);
-    data.results.forEach(w => addWordRow(w.en, w.cs));
-    document.getElementById('pasteArea').value = '';
-    resetTranslateBtn();
-
-    if (failed.length) {
-      errEl.textContent = `⚠️ ${failed.length} slovíček se nepodařilo přeložit – doplň je ručně.`;
-      errEl.style.display = 'block';
+  pairs.forEach(pair => {
+    // Rozdělení pomlčkou – bereme první pomlčku jako oddělovač
+    const dashIdx = pair.indexOf('-');
+    if (dashIdx < 1) {
+      failed.push(pair);
+      return;
     }
-    toast(`Přeloženo ${data.results.length - failed.length} z ${words.length} slovíček ✓`);
-  } catch(err) {
-    errEl.textContent = '⚠️ ' + err.message;
+    const en = pair.slice(0, dashIdx).trim();
+    const cs = pair.slice(dashIdx + 1).trim();
+    if (!en || !cs) {
+      failed.push(pair);
+      return;
+    }
+    addWordRow(en, cs);
+  });
+
+  document.getElementById('pasteArea').value = '';
+  const btn = document.getElementById('btnTranslate');
+  btn.className = 'btn-translate disabled';
+
+  if (failed.length) {
+    errEl.textContent = `⚠️ Tato slovíčka nebyla ve správném formátu: ${failed.join(', ')}`;
     errEl.style.display = 'block';
-    resetTranslateBtn();
   }
+
+  const added = pairs.length - failed.length;
+  if (added > 0) toast(`Přidáno ${added} slovíček ✓`);
 }
 
 // ── SAVE SET ──
