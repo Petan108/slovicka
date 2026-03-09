@@ -590,11 +590,13 @@ function handlePaste() {
   var failed = [];
 
   pairs.forEach(function(pair) {
-    // Najdi první pomlčku jako oddělovač
-    var dash = pair.indexOf('-');
+    // Najdi první pomlčku jako oddělovač (krátká -, dlouhá –, em —)
+    var dashMatch = pair.match(/[-\u2013\u2014]/);
+    if (!dashMatch) { failed.push(pair); return; }
+    var dash = pair.indexOf(dashMatch[0]);
     if (dash < 1) { failed.push(pair); return; }
     var en = pair.slice(0, dash).trim();
-    var cs = pair.slice(dash + 1).trim();
+    var cs = pair.slice(dash + dashMatch[0].length).trim();
     if (!en || !cs) { failed.push(pair); return; }
     addWordRow(en, cs);
     added++;
